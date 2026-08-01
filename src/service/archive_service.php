@@ -15,6 +15,10 @@ class archive_service
     /**
      * e-Arşiv faturası oluşturur (senkron).
      *
+     * WSDL yapısı: `faturaOlusturExt(input: JSON-string, fatura: belge, output: belge)`.
+     * Mantıksal parametrelerin tamamı `input` JSON'ında gider; XML ham hali
+     * `fatura.belgeIcerigi` (base64Binary) olarak gönderilir.
+     *
      * @param string $belge_icerigi_base64 Fatura XML'inin base64 hali
      * @param archive_output_format $donen_belge_formati Dönen format (UBL/HTML/PDF/YOK)
      * @param string $islem_id UUID (ETTN ile aynı olması önerilir)
@@ -40,47 +44,72 @@ class archive_service
         ?string $sablon_adi = null,
         ?int $taslaga_yonlendir = null,
     ): archive_result {
-        $params = [
-            'donenBelgeFormati' => $donen_belge_formati->value,
-            'islemId' => $islem_id,
+        $input = [
+            'islemId' => $islem_id ?? $this->uuid(),
             'vkn' => $vkn,
             'sube' => $sube,
             'kasa' => $kasa,
             'erpKodu' => $erp_kodu,
-            'belgeFormati' => 'UBL',
-            'belgeIcerigi' => $belge_icerigi_base64,
+            'donenBelgeFormati' => (string) $donen_belge_formati->value,
         ];
 
         if ($numara_verilsin_mi !== null) {
-            $params['numaraVerilsinMi'] = $numara_verilsin_mi;
+            $input['numaraVerilsinMi'] = $numara_verilsin_mi;
         }
         if ($fatura_seri !== null) {
-            $params['faturaSeri'] = $fatura_seri;
+            $input['faturaSeri'] = $fatura_seri;
         }
         if ($sablon_adi !== null) {
-            $params['sablonAdi'] = $sablon_adi;
+            $input['sablonAdi'] = $sablon_adi;
         }
         if ($taslaga_yonlendir !== null) {
-            $params['taslagaYonlendir'] = $taslaga_yonlendir;
+            $input['taslagaYonlendir'] = $taslaga_yonlendir;
         }
+
+        $params = [
+            'input' => json_encode($input, JSON_UNESCAPED_UNICODE),
+            // `belgeIcerigi` WSDL'de base64Binary; SoapClient ham değeri kendi encode eder.
+            // Çift-base64 tuzağını önlemek için base64 çözülmüş ham XML geçilir.
+            'fatura' => [
+                'belgeFormati' => 'UBL',
+                'belgeIcerigi' => base64_decode($belge_icerigi_base64, true),
+            ],
+        ];
 
         $result = $this->soap->faturaOlusturExt($params);
 
+        // Cevap: belgeOutputWrapper { output: belge, return: earsivServiceResult }
+        $servis_sonuc = $result->return ?? $result;
+
         $extra = [];
-        if (isset($result->resultExtra)) {
-            $entries = $result->resultExtra->entry ?? [];
+        if (isset($servis_sonuc->resultExtra->entry)) {
+            $entries = is_array($servis_sonuc->resultExtra->entry)
+                ? $servis_sonuc->resultExtra->entry
+                : [$servis_sonuc->resultExtra->entry];
             foreach ($entries as $entry) {
                 $extra[$entry->key] = $entry->value;
             }
         }
 
+        // output.belgeIcerigi (base64Binary) SoapClient tarafından decode edilir;
+        // archive_result.output_base64 base64 beklediği için tekrar encode edilir.
+        $output_icerik = $result->output->belgeIcerigi ?? null;
+
         return new archive_result(
-            output_base64: $result->output ?? null,
+            output_base64: $output_icerik !== null ? base64_encode($output_icerik) : null,
             islem_id: $extra['islemID'] ?? '',
             fatura_url: $extra['faturaURL'] ?? '',
             uuid: $extra['uuid'] ?? '',
             fatura_no: $extra['faturaNo'] ?? '',
             iptal_tarihi: $extra['iptalTarihi'] ?? null,
         );
+    }
+
+    private function uuid(): string
+    {
+        $data = random_bytes(16);
+        $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
+        $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
+        return strtoupper(vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4)));
     }
 }

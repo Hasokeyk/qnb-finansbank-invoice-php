@@ -57,7 +57,7 @@ class despatch_service
             'vergiTcKimlikNo' => $vergi_tc_kimlik_no,
             'belgeTuru' => $belge_turu,
             'belgeNo' => $belge_no,
-            'veri' => $veri_base64,
+            'veri' => base64_decode($veri_base64, true),
             'belgeHash' => $belge_hash_md5,
             'mimeType' => 'application_xml',
             'belgeVersiyon' => $belge_versiyon,
@@ -71,7 +71,9 @@ class despatch_service
             'parametreler' => $params,
         ]);
 
-        return $result->belgeOid ?? '';
+        $data = $result->return ?? $result;
+
+        return $data->belgeOid ?? '';
     }
 
     public function giden_belge_durum_sorgula_ext(
@@ -82,25 +84,29 @@ class despatch_service
     ): document_status {
         $result = $this->connector->gidenBelgeDurumSorgulaExt([
             'vergiTcKimlikNo' => $vergi_tc_kimlik_no,
-            'belgeNo' => $belge_no,
-            'belgeNoTip' => $belge_no_tip,
-            'belgeTuru' => $belge_turu,
+            'parametreler' => [
+                'belgeNo' => $belge_no,
+                'belgeNoTipi' => $belge_no_tip,
+                'belgeTuru' => $belge_turu,
+            ],
         ]);
 
+        $data = $result->return ?? $result;
+
         return new document_status(
-            alim_tarihi: $result->alimTarihi ?? '',
-            belge_no: $result->belgeNo ?? '',
-            durum: (int) ($result->durum ?? 0),
-            ettin: $result->ettn ?? '',
-            gonderim_cevabi_detayi: $result->gonderimCevabiDetayi ?? '',
-            gonderim_cevabi_kodu: $result->gonderimCevabiKodu ?? '',
-            gonderim_durumu: (int) ($result->gonderimDurumu ?? 0),
-            olusturulma_tarihi: $result->olusturulmaTarihi ?? '',
-            yanit_detayi: $result->yanitDetayı ?? '',
-            yanit_durumu: $result->yanitDurumu ?? '',
-            ulasti_mi: ($result->ulastiMi ?? false) === true,
-            yeniden_gonderilebilir_mi: ($result->yenidenGonderilebilirMi ?? false) === true,
-            yerel_belge_oid: $result->yerelBelgeOid ?? '',
+            alim_tarihi: $data->alimTarihi ?? '',
+            belge_no: $data->belgeNo ?? '',
+            durum: (int) ($data->durum ?? 0),
+            ettn: $data->ettn ?? '',
+            gonderim_cevabi_detayi: $data->aciklama ?? $data->gonderimCevabiDetayi ?? '',
+            gonderim_cevabi_kodu: $data->gonderimCevabiKodu ?? '',
+            gonderim_durumu: (int) ($data->gonderimDurumu ?? 0),
+            olusturulma_tarihi: $data->olusturulmaTarihi ?? '',
+            yanit_detayi: $data->yanitDetayi ?? '',
+            yanit_durumu: $data->yanitDurumu ?? '',
+            ulasti_mi: ($data->ulastiMi ?? false) === true,
+            yeniden_gonderilebilir_mi: ($data->yenidenGonderilebilirMi ?? false) === true,
+            yerel_belge_oid: $data->yerelBelgeOid ?? '',
         );
     }
 

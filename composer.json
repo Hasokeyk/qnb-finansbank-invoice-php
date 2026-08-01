@@ -1,5 +1,6 @@
 {
     "name": "qnb-finansbank-invoice/qnb-esolutions",
+    "version": "1.0.1",
     "description": "QNB eSolutions e-Fatura, e-İrsaliye, e-Arşiv ve e-Defter SOAP API PHP istemci kütüphanesi",
     "type": "library",
     "license": "MIT",
@@ -11,7 +12,10 @@
     "autoload": {
         "psr-4": {
             "QnbSolutions\\QnbEsolutions\\": "src/"
-        }
+        },
+        "files": [
+            "src/functions.php"
+        ]
     },
     "scripts": {
         "test": "phpunit",

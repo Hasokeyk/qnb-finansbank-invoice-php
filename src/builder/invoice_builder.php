@@ -6,13 +6,27 @@ class invoice_builder
 {
     public const TYPE_SATIS = 'SATIS';
     public const TYPE_IADE = 'IADE';
-    public const TYPE_TICARI = 'TICARI';
-    public const TYPE_KDV_MUAFIYETI = 'KDV_MUAFIYETI';
+    public const TYPE_TICARI = 'SATIS';
+    public const TYPE_KDV_MUAFIYETI = 'ISTISNA';
     public const TYPE_ISTISNA = 'ISTISNA';
     public const TYPE_TEVKIFAT = 'TEVKIFAT';
     public const TYPE_TASHIH = 'TASHIH';
     public const TYPE_IHRACAT = 'IHRACAT';
     public const TYPE_YOLCU_BERABERI = 'YOLCU_BERABERI';
+    public const TYPE_IHRAC_KAYITLI = 'IHRACKAYITLI';
+    public const TYPE_SGK = 'SGK';
+    public const TYPE_YTBIADE = 'YTBIADE';
+    public const TYPE_YTBISTISNA = 'YTBISTISNA';
+
+    /** Muafiyet/istisna kodlu satır içeren faturaların geçerli olduğu fatura tipleri (GİB). */
+    public const MUAFIYET_UYUMLU_TIPLER = [
+        self::TYPE_ISTISNA,
+        self::TYPE_IADE,
+        self::TYPE_IHRAC_KAYITLI,
+        self::TYPE_SGK,
+        self::TYPE_YTBIADE,
+        self::TYPE_YTBISTISNA,
+    ];
 
     public const PROFILE_TEMEL = 'TEMELFATURA';
     public const PROFILE_TICARI = 'TICARIFATURA';
@@ -31,11 +45,17 @@ class invoice_builder
     private string $satici_vkn = '';
     private string $satici_unvan = '';
     private string $satici_etiket = '';
+    private string $satici_vergi_dairesi = 'ÇANKAYA';
+    private string $satici_adres = '';
+    private string $satici_ilce = '';
+    private string $satici_il = '';
+    private string $satici_ulke = 'Türkiye';
 
     private string $alici_vkn = '';
     private string $alici_unvan = '';
     private string $alici_ad = '';
     private string $alici_soyad = '';
+    private string $alici_vergi_dairesi = 'ÇANKAYA';
 
     private string $alici_ilce = '';
     private string $alici_il = '';
@@ -94,6 +114,27 @@ class invoice_builder
         return $this;
     }
 
+    public function set_satici_vergi_dairesi(string $vergi_dairesi): static
+    {
+        $this->satici_vergi_dairesi = $vergi_dairesi;
+        return $this;
+    }
+
+    public function set_satici_adres(string $adres, string $ilce, string $il, string $ulke = 'Türkiye'): static
+    {
+        $this->satici_adres = $adres;
+        $this->satici_ilce = $ilce;
+        $this->satici_il = $il;
+        $this->satici_ulke = $ulke;
+        return $this;
+    }
+
+    public function set_alici_vergi_dairesi(string $vergi_dairesi): static
+    {
+        $this->alici_vergi_dairesi = $vergi_dairesi;
+        return $this;
+    }
+
     public function set_alici_adres(string $adres, string $ilce, string $il, string $ulke = 'Türkiye'): static
     {
         $this->alici_adres = $adres;
@@ -147,6 +188,7 @@ class invoice_builder
         $kdv_toplam = 0.0;
         $mal_toplam = 0.0;
         $satir_xml = '';
+        $kdv_gruplari = [];
 
         foreach ($this->satirlar as $i => $s) {
             $line_no = $i + 1;
@@ -159,6 +201,7 @@ class invoice_builder
                 $iskonto_xml = <<<XML
             <cac:AllowanceCharge>
                <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+               <cbc:MultiplierFactorNumeric>{$s['iskonto']}</cbc:MultiplierFactorNumeric>
                <cbc:Amount currencyID="{$this->parabirimi}">{$s['iskonto']}</cbc:Amount>
                <cbc:BaseAmount currencyID="{$this->parabirimi}">{$ara_toplam}</cbc:BaseAmount>
             </cac:AllowanceCharge>
@@ -176,15 +219,30 @@ XML;
             $kdv_toplam += $kdv_tutar;
             $mal_toplam += $iskonto_sonrasi;
 
+            $grup_key = $s['kdv_oran'] . '|' . ($muafiyetli ? $s['kdv_muafiyet_kodu'] : '');
+            if (!isset($kdv_gruplari[$grup_key])) {
+                $kdv_gruplari[$grup_key] = [
+                    'oran' => $s['kdv_oran'],
+                    'muafiyet_kodu' => $s['kdv_muafiyet_kodu'],
+                    'muafiyet_aciklama' => $s['kdv_muafiyet_aciklama'],
+                    'taxable' => 0.0,
+                    'tax' => 0.0,
+                ];
+            }
+            $kdv_gruplari[$grup_key]['taxable'] += $iskonto_sonrasi;
+            $kdv_gruplari[$grup_key]['tax'] += $kdv_tutar;
+
             $muafiyet_xml = '';
             if ($muafiyetli) {
                 $aciklama = $s['kdv_muafiyet_aciklama'] !== ''
-                    ? "\n               <cbc:TaxExemptionReason>{$s['kdv_muafiyet_aciklama']}</cbc:TaxExemptionReason>"
+                    ? "\n                  <cbc:TaxExemptionReason>{$s['kdv_muafiyet_aciklama']}</cbc:TaxExemptionReason>"
                     : '';
                 $muafiyet_xml = <<<XML
-               <cbc:TaxExemptionReasonCode>{$s['kdv_muafiyet_kodu']}</cbc:TaxExemptionReasonCode>{$aciklama}
+                  <cbc:TaxExemptionReasonCode>{$s['kdv_muafiyet_kodu']}</cbc:TaxExemptionReasonCode>{$aciklama}
 XML;
             }
+
+            $percent_xml = $muafiyetli ? '' : "                  <cbc:Percent>{$s['kdv_oran']}</cbc:Percent>\n";
 
             $satir_xml .= <<<XML
             <cac:InvoiceLine>
@@ -197,10 +255,8 @@ XML;
                   <cac:TaxSubtotal>
                      <cbc:TaxableAmount currencyID="{$this->parabirimi}">{$iskonto_sonrasi}</cbc:TaxableAmount>
                      <cbc:TaxAmount currencyID="{$this->parabirimi}">{$kdv_tutar}</cbc:TaxAmount>
-                     <cbc:Percent>{$s['kdv_oran']}</cbc:Percent>
-                     <cac:TaxCategory>
-{$muafiyet_xml}
-                        <cac:TaxScheme>
+{$percent_xml}                     <cac:TaxCategory>
+{$muafiyet_xml}                        <cac:TaxScheme>
                            <cbc:Name>KDV</cbc:Name>
                            <cbc:TaxTypeCode>0015</cbc:TaxTypeCode>
                         </cac:TaxScheme>
@@ -220,34 +276,85 @@ XML;
         $kdv_toplam = round($kdv_toplam, 2);
         $genel_toplam = round($mal_toplam + $kdv_toplam, 2);
 
+        $header_vergi_xml = '';
+        foreach ($kdv_gruplari as $g) {
+            $muafiyetli = $g['muafiyet_kodu'] !== '';
+            $muafiyet_xml = '';
+            if ($muafiyetli) {
+                $aciklama = $g['muafiyet_aciklama'] !== ''
+                    ? "\n                  <cbc:TaxExemptionReason>{$g['muafiyet_aciklama']}</cbc:TaxExemptionReason>"
+                    : '';
+                $muafiyet_xml = "                  <cbc:TaxExemptionReasonCode>{$g['muafiyet_kodu']}</cbc:TaxExemptionReasonCode>{$aciklama}\n";
+            }
+            $percent_xml = $muafiyetli ? '' : "                     <cbc:Percent>{$g['oran']}</cbc:Percent>\n";
+            $header_vergi_xml .= <<<XML
+         <cac:TaxSubtotal>
+            <cbc:TaxableAmount currencyID="{$this->parabirimi}">{$g['taxable']}</cbc:TaxableAmount>
+            <cbc:TaxAmount currencyID="{$this->parabirimi}">{$g['tax']}</cbc:TaxAmount>
+{$percent_xml}            <cac:TaxCategory>
+{$muafiyet_xml}               <cac:TaxScheme>
+                  <cbc:Name>KDV</cbc:Name>
+                  <cbc:TaxTypeCode>0015</cbc:TaxTypeCode>
+               </cac:TaxScheme>
+            </cac:TaxCategory>
+         </cac:TaxSubtotal>
+
+XML;
+        }
+
+        $satici_adres_xml = $this->build_adres(
+            $this->satici_adres,
+            $this->satici_ilce,
+            $this->satici_il,
+            $this->satici_ulke,
+            3,
+        );
         $alici_xml = $this->build_alici();
+        $satir_sayisi = count($this->satirlar);
+
         $aciklama_xml = $this->aciklama ? "   <cbc:Note>{$this->aciklama}</cbc:Note>\n" : '';
+        $saat_xml = $saat !== '' ? "   <cbc:IssueTime>{$saat}</cbc:IssueTime>\n" : '';
+
         $odeme_xml = '';
         if ($this->teslim_gun > 0) {
             $bit_tarih = date('Y-m-d', strtotime($tarih . ' +' . $this->teslim_gun . ' days'));
             $odeme_xml = <<<XML
-            <cac:PaymentMeans>
-               <cbc:PaymentMeansCode>ZZZ</cbc:PaymentMeansCode>
-               <cbc:PaymentDueDate>{$bit_tarih}</cbc:PaymentDueDate>
-            </cac:PaymentMeans>
+   <cac:PaymentMeans>
+      <cbc:PaymentMeansCode>ZZZ</cbc:PaymentMeansCode>
+      <cbc:PaymentDueDate>{$bit_tarih}</cbc:PaymentDueDate>
+   </cac:PaymentMeans>
 XML;
         }
+
+        $signature_xml = $this->build_signature();
 
         return <<<XML
 <?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
          xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
          xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
-         xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">
+         xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns:n4="http://www.altova.com/samplexml/other-namespace"
+         xsi:schemaLocation="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2 UBL-Invoice-2.1.xsd">
+   <ext:UBLExtensions>
+      <ext:UBLExtension>
+         <ext:ExtensionContent>
+            <n4:auto-generated_for_wildcard/>
+         </ext:ExtensionContent>
+      </ext:UBLExtension>
+   </ext:UBLExtensions>
    <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
    <cbc:CustomizationID>TR1.2</cbc:CustomizationID>
    <cbc:ProfileID>{$this->profil}</cbc:ProfileID>
    <cbc:ID>{$no}</cbc:ID>
+   <cbc:CopyIndicator>false</cbc:CopyIndicator>
+   <cbc:UUID>{$this->uuid($no)}</cbc:UUID>
    <cbc:IssueDate>{$tarih}</cbc:IssueDate>
-{$aciklama_xml}
-   <cbc:InvoiceTypeCode>{$this->fatura_turu}</cbc:InvoiceTypeCode>
-   <cbc:DocumentCurrencyCode>{$this->parabirimi}</cbc:DocumentCurrencyCode>
-   <cac:AccountingSupplierParty>
+{$saat_xml}   <cbc:InvoiceTypeCode>{$this->fatura_turu}</cbc:InvoiceTypeCode>
+{$aciklama_xml}   <cbc:DocumentCurrencyCode>{$this->parabirimi}</cbc:DocumentCurrencyCode>
+   <cbc:LineCountNumeric>{$satir_sayisi}</cbc:LineCountNumeric>
+{$signature_xml}   <cac:AccountingSupplierParty>
       <cac:Party>
          <cac:PartyIdentification>
             <cbc:ID schemeID="VKN">{$this->satici_vkn}</cbc:ID>
@@ -255,21 +362,75 @@ XML;
          <cac:PartyName>
             <cbc:Name>{$this->satici_unvan}</cbc:Name>
          </cac:PartyName>
+{$satici_adres_xml}         <cac:PartyTaxScheme>
+            <cac:TaxScheme>
+               <cbc:Name>{$this->satici_vergi_dairesi}</cbc:Name>
+            </cac:TaxScheme>
+         </cac:PartyTaxScheme>
       </cac:Party>
    </cac:AccountingSupplierParty>
 {$alici_xml}
-   <cac:TaxTotal>
+{$odeme_xml}   <cac:TaxTotal>
       <cbc:TaxAmount currencyID="{$this->parabirimi}">{$kdv_toplam}</cbc:TaxAmount>
-   </cac:TaxTotal>
+{$header_vergi_xml}   </cac:TaxTotal>
    <cac:LegalMonetaryTotal>
       <cbc:LineExtensionAmount currencyID="{$this->parabirimi}">{$mal_toplam}</cbc:LineExtensionAmount>
       <cbc:TaxExclusiveAmount currencyID="{$this->parabirimi}">{$mal_toplam}</cbc:TaxExclusiveAmount>
       <cbc:TaxInclusiveAmount currencyID="{$this->parabirimi}">{$genel_toplam}</cbc:TaxInclusiveAmount>
       <cbc:PayableAmount currencyID="{$this->parabirimi}">{$genel_toplam}</cbc:PayableAmount>
    </cac:LegalMonetaryTotal>
-{$odeme_xml}
 {$satir_xml}
 </Invoice>
+XML;
+    }
+
+    private function uuid(string $seed): string
+    {
+        $h = md5($seed);
+        return strtoupper(
+            substr($h, 0, 8) . '-' . substr($h, 8, 4) . '-4' . substr($h, 13, 3)
+            . '-' . '8' . substr($h, 17, 3) . '-' . substr($h, 20, 12)
+        );
+    }
+
+    private function build_adres(string $adres, string $ilce, string $il, string $ulke, int $indent): string
+    {
+        $pad = str_repeat(' ', $indent);
+        return <<<XML
+$pad<cac:PostalAddress>
+$pad   <cbc:StreetName>{$adres}</cbc:StreetName>
+$pad   <cbc:CitySubdivisionName>{$ilce}</cbc:CitySubdivisionName>
+$pad   <cbc:CityName>{$il}</cbc:CityName>
+$pad   <cac:Country>
+$pad      <cbc:Name>{$ulke}</cbc:Name>
+$pad   </cac:Country>
+$pad</cac:PostalAddress>
+XML;
+    }
+
+    private function build_signature(): string
+    {
+        $adres_xml = $this->build_adres(
+            $this->satici_adres,
+            $this->satici_ilce,
+            $this->satici_il,
+            $this->satici_ulke,
+            9,
+        );
+        return <<<XML
+   <cac:Signature>
+      <cbc:ID schemeID="VKN_TCKN">{$this->satici_vkn}</cbc:ID>
+      <cac:SignatoryParty>
+         <cac:PartyIdentification>
+            <cbc:ID schemeID="VKN">{$this->satici_vkn}</cbc:ID>
+         </cac:PartyIdentification>
+{$adres_xml}      </cac:SignatoryParty>
+      <cac:DigitalSignatureAttachment>
+         <cac:ExternalReference>
+            <cbc:URI>#Signature</cbc:URI>
+         </cac:ExternalReference>
+      </cac:DigitalSignatureAttachment>
+   </cac:Signature>
 XML;
     }
 
@@ -292,13 +453,13 @@ XML;
             </cac:Contact>
 XML : '';
 
-        $adres = $this->alici_adres !== '' ? <<<XML
-            <cac:PostalAddress>
-               <cbc:StreetName>{$this->alici_adres}</cbc:StreetName>
-               <cbc:CitySubdivisionName>{$this->alici_ilce}</cbc:CitySubdivisionName>
-               <cbc:CityName>{$this->alici_il}</cbc:CityName>
-            </cac:PostalAddress>
-XML : '';
+        $adres_xml = $this->build_adres(
+            $this->alici_adres,
+            $this->alici_ilce,
+            $this->alici_il,
+            $this->alici_ulke,
+            3,
+        );
 
         return <<<XML
    <cac:AccountingCustomerParty>
@@ -309,8 +470,12 @@ XML : '';
          <cac:PartyName>
             <cbc:Name>{$this->alici_unvan}</cbc:Name>
          </cac:PartyName>
+{$adres_xml}         <cac:PartyTaxScheme>
+            <cac:TaxScheme>
+               <cbc:Name>{$this->alici_vergi_dairesi}</cbc:Name>
+            </cac:TaxScheme>
+         </cac:PartyTaxScheme>
 {$kisi}
-{$adres}
       </cac:Party>
    </cac:AccountingCustomerParty>
 XML;

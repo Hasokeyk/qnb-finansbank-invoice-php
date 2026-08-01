@@ -1,5 +1,6 @@
 vendor/
 .idea/
+.claude/
 *.log
 index.php
-AGENTS.md
+control.php
