@@ -53,7 +53,7 @@ Handles e-Invoice (e-Fatura), e-Despatch (e-İrsaliye), e-Archive (e-Arşiv) and
 ## Installation
 
 ```bash
-composer require qnb-finansbank-invoice/qnb-esolutions
+composer require hasokeyk/qnb-finansbank-invoice
 ```
 
 > If the package is not yet published on Packagist, define a VCS (git) repository source in `composer.json` and install it with the same command.

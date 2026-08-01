@@ -53,7 +53,7 @@ e-Fatura, e-İrsaliye, e-Arşiv ve e-Defter işlemlerini tek bir kütüphane üz
 ## Kurulum
 
 ```bash
-composer require qnb-finansbank-invoice/qnb-esolutions
+composer require hasokeyk/qnb-finansbank-invoice
 ```
 
 > Paket şu anda Packagist üzerinde yayınlanmamışsa, `composer.json`'da bir VCS (git) repository kaynağı tanımlayıp aynı komutla kurabilirsiniz.

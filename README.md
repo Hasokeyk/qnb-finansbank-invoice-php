@@ -27,7 +27,7 @@ e-Fatura, e-İrsaliye, e-Arşiv ve e-Defter işlemlerini tek bir kütüphane üz
 | e-Defter | `$c->ledger()` |
 
 ```bash
-composer require qnb-finansbank-invoice/qnb-esolutions
+composer require hasokeyk/qnb-finansbank-invoice
 ```
 
 **Kurulum, örnekler ve tüm detaylar için:** 📄 [`README.tr.md`](README.tr.md) · 📄 [`README.en.md`](README.en.md)
