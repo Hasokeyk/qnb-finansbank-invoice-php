@@ -17,6 +17,10 @@ class invoice_builder
     public const TYPE_SGK = 'SGK';
     public const TYPE_YTBIADE = 'YTBIADE';
     public const TYPE_YTBISTISNA = 'YTBISTISNA';
+    public const TYPE_TEVKIFAT_IADE = 'TEVKIFATIADE';
+    public const TYPE_OZEL_MATRAH = 'OZELMATRAH';
+    public const TYPE_KOMISYONCU = 'KOMISYONCU';
+    public const TYPE_KONAKLAMA_VERGISI = 'KONAKLAMAVERGISI';
 
     /** Muafiyet/istisna kodlu satır içeren faturaların geçerli olduğu fatura tipleri (GİB). */
     public const MUAFIYET_UYUMLU_TIPLER = [
@@ -28,10 +32,45 @@ class invoice_builder
         self::TYPE_YTBISTISNA,
     ];
 
+    /** QNB panelindeki resmi InvoiceTypeCode listesi. */
+    public const INVOICE_TYPE_CODES = [
+        self::TYPE_SATIS,
+        self::TYPE_IADE,
+        self::TYPE_TEVKIFAT,
+        self::TYPE_TEVKIFAT_IADE,
+        self::TYPE_ISTISNA,
+        self::TYPE_OZEL_MATRAH,
+        self::TYPE_IHRAC_KAYITLI,
+        self::TYPE_SGK,
+        self::TYPE_KOMISYONCU,
+        self::TYPE_KONAKLAMA_VERGISI,
+    ];
+
     public const PROFILE_TEMEL = 'TEMELFATURA';
     public const PROFILE_TICARI = 'TICARIFATURA';
     public const PROFILE_EARSIV = 'EARSIVFATURA';
     public const PROFILE_IHRACAT = 'IHRACAT';
+    public const PROFILE_KAMU = 'KAMU';
+    public const PROFILE_YOLCU_BERABER = 'YOLCUBERABERFATURA';
+    public const PROFILE_HKS = 'HKS';
+    public const PROFILE_ENERJI = 'ENERJI';
+    public const PROFILE_ILAC_TIBBI_CIHAZ = 'ILAC_TIBBICIHAZ';
+    public const PROFILE_YATIRIM_TESVIK = 'YATIRIMTESVIK';
+    public const PROFILE_IDIS = 'IDIS';
+
+    /** QNB panelindeki resmi ProfileID listesi. */
+    public const PROFILE_IDS = [
+        self::PROFILE_TEMEL,
+        self::PROFILE_TICARI,
+        self::PROFILE_KAMU,
+        self::PROFILE_IHRACAT,
+        self::PROFILE_YOLCU_BERABER,
+        self::PROFILE_HKS,
+        self::PROFILE_ENERJI,
+        self::PROFILE_ILAC_TIBBI_CIHAZ,
+        self::PROFILE_YATIRIM_TESVIK,
+        self::PROFILE_IDIS,
+    ];
 
     private const TAX_TYPE_CODES = [1 => '0015', 8 => '0015', 10 => '0015', 18 => '0015', 20 => '0015'];
 

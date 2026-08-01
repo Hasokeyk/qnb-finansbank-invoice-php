@@ -19,12 +19,17 @@ e-Fatura, e-İrsaliye, e-Arşiv ve e-Defter işlemlerini tek bir kütüphane üz
 
 ## Hızlı Bakış / Quick Overview
 
-| Modül / Module | Servis / Service |
+| Modül / Module | Kullanım / Usage |
 |----------------|------------------|
-| e-Fatura | `$c->invoice()` |
-| e-İrsaliye | `$c->despatch()` |
-| e-Arşiv | `$c->archive()` |
-| e-Defter | `$c->ledger()` |
+| e-Fatura | `$qnb->create_invoice('efatura')->send()` |
+| e-Arşiv | `$qnb->create_invoice('earsiv')->send()` |
+| e-İrsaliye | `(new client(...))->despatch()` *(düşük seviye, builder yok)* |
+| e-Defter | `(new client(...))->ledger()` *(düşük seviye)* |
+
+```php
+$qnb = new QnbSolutions\QnbEsolutions\qnb_esolutions($user, $pass, $erp_kodu);
+$oid = $qnb->create_invoice('auto')->send(); // auto: e-Fatura mükellefiyetine göre
+```
 
 ```bash
 composer require hasokeyk/qnb-finansbank-invoice
