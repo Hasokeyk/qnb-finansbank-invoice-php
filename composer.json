@@ -12,10 +12,7 @@
     "autoload": {
         "psr-4": {
             "QnbSolutions\\QnbEsolutions\\": "src/"
-        },
-        "files": [
-            "src/functions.php"
-        ]
+        }
     },
     "scripts": {
         "test": "phpunit",

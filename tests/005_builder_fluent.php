@@ -11,6 +11,7 @@ use QnbSolutions\QnbEsolutions\builder\customer_company;
 use QnbSolutions\QnbEsolutions\builder\my_company;
 use QnbSolutions\QnbEsolutions\builder\products;
 use QnbSolutions\QnbEsolutions\client;
+use QnbSolutions\QnbEsolutions\qnb_esolutions;
 use QnbSolutions\QnbEsolutions\service\archive_service;
 use QnbSolutions\QnbEsolutions\service\invoice_service;
 
@@ -160,11 +161,11 @@ test('earsiv input JSON donenBelgeFormati', $input['donenBelgeFormati'] ?? '', '
 test('earsiv fatura belgeFormati UBL', $fatura['belgeFormati'] ?? '', 'UBL');
 test('earsiv fatura belgeIcerigi decode edilmis XML', str_contains($fatura['belgeIcerigi'] ?? '', '<Invoice'), true);
 
-// ─── qnb_invoice facade ──────────────────────────────────────────────────
+// ─── qnb_esolutions facade ───────────────────────────────────────────────
 $mock->calls = [];
-$qnb = qnb_invoice('kullanici', 'sifre', 'ERP1', client::ENV_TEST2, $test_client);
+$qnb = new qnb_esolutions('kullanici', 'sifre', 'ERP1', client::ENV_TEST2, $test_client);
 
-$qnb->invoice()->my_company()
+$qnb->my_company()
     ->set_company_name('TEST2 FİRMASI')
     ->set_tax_number('6312064091');
 $qnb->customer_company()
@@ -176,7 +177,7 @@ $qnb->product()
     ->set_unit_price(100.00)
     ->set_vat_rate(20);
 
-$oid = $qnb->send();
+$oid = $qnb->create_invoice('efatura')->send();
 test('facade OID', $oid, 'OID-EFATURA');
 
 $call = $mock->calls[0];
