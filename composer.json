@@ -1,6 +1,5 @@
 {
     "name": "hasokeyk/qnb-finansbank-invoice",
-    "version": "1.0.1",
     "description": "QNB eSolutions e-Fatura, e-İrsaliye, e-Arşiv ve e-Defter SOAP API PHP istemci kütüphanesi",
     "type": "library",
     "license": "MIT",
