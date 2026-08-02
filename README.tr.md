@@ -103,6 +103,52 @@ $oid = $c->invoice()->belge_gonder_ext(
 echo "Gönderildi! Belge OID: {$oid}\n";
 ```
 
+### Facade: `qnb_esolutions` (önerilen)
+
+Tek giriş noktası; doğrulama `create_invoice()` içinde yapılır:
+
+```php
+<?php
+
+require 'vendor/autoload.php';
+
+use QnbSolutions\QnbEsolutions\builder\invoice_builder;
+use QnbSolutions\QnbEsolutions\qnb_esolutions;
+
+$qnb = new qnb_esolutions('KULLANICI_ADI', 'SIFRE', 'ERP_KODU');
+
+$qnb->document_no('NXT' . date('Y') . '000000001')   // GİB formatı: 3 harf + yıl + 9 hane
+    ->issue_date(date('Y-m-d'))
+    ->invoice_type(invoice_builder::TYPE_SATIS)      // SATIS | ISTISNA | IADE | ...
+    ->profile(invoice_builder::PROFILE_TICARI)       // TICARIFATURA | TEMELFATURA | ...
+    ->currency('TRY');
+
+$qnb->my_company()
+    ->set_company_name('SATICI A.Ş.')
+    ->set_tax_number('VKN')
+    ->set_tax_office('ÇANKAYA')
+    ->set_address('Adres Sokak No:1', 'Çankaya', 'Ankara', 'Türkiye');
+
+$qnb->customer_company()
+    ->set_company_name('ALICI LTD.')
+    ->set_tax_number('ALICI_VKN')
+    ->set_tax_office('ÇANKAYA')
+    ->set_address('Adres Sokak No:2', 'Kadıköy', 'İstanbul', 'Türkiye');
+
+$qnb->add_product()
+    ->set_product_name('Hizmet')
+    ->set_quantity(1)
+    ->set_unit_price(1000.00)
+    ->set_vat_rate(20);
+
+// 'auto' | 'efatura' | 'earsiv'
+$sonuc = $qnb->create_invoice('auto')->send();
+```
+
+- `create_invoice('auto')` → alıcı e-Fatura mükellefi ise e-Fatura, değilse e-Arşiv keser.
+- `create_invoice('efatura')` → alıcı mükellef değilse `validation_exception` fırlatır (1172 `TPS_POSTA_KUTUSU_YETKISI_YOK` öncesi).
+- **Doğrulama `create_invoice` içindedir**: eksik zorunlu alan (satıcı/alıcı VKN, ünvan, adres, il; ürün ad, adet, fiyat, KDV; belge no formatı) → `validation_exception` fırlatılır ve gönderim olmaz.
+
 ---
 
 ## Mimari
@@ -231,6 +277,7 @@ $oid = $c->invoice()->belge_gonder_ext(
 - **Hash formülü**: `belge_hash_md5 = strtoupper(md5($xml))` — **ham UBL XML** üzerinde, **BÜYÜK harf** hex MD5. Küçük harf veya farklı içerik → `SoapFault "Hash hatası"`.
 - **ERP kodu**: Özel entegratör ERP kodunuzu kullanın (`erp_kodu` veya `erpBilgileriBelirle`). `ERP1`/`ERP2` gibi değerler sunucu tarafından reddedilir.
 - **InvoiceTypeCode GİB'in sıkı kod listesidir**: `TICARI` ve `KDV_MUAFIYETI` **geçersizdir** (şema kontrolü hata verir). `TICARIFATURA` bir `ProfileID`'dir, tip değildir. QNB panelindeki **InvoiceTypeCode** listesi: `SATIS, IADE, TEVKIFAT, TEVKIFATIADE, ISTISNA, OZELMATRAH, IHRACKAYITLI, SGK, KOMISYONCU, KONAKLAMAVERGISI`. **ProfileID** listesi: `TEMELFATURA, TICARIFATURA, KAMU, IHRACAT, YOLCUBERABERFATURA, HKS, ENERJI, ILAC_TIBBICIHAZ, YATIRIMTESVIK, IDIS`. Builder listeleri: `invoice_builder::INVOICE_TYPE_CODES` ve `invoice_builder::PROFILE_IDS`. KDV muafiyet/istisna kodlu satır içeren faturalar `MUAFIYET_UYUMLU_TIPLER` listesindeki tiplerden biri olmalıdır.
+- **`create_invoice()` doğrulaması**: eksik zorunlu alanlar `validation_exception` fırlatır ve gönderim olmaz — satıcı/alıcı VKN, ünvan, adres, il; ürün ad, adet (>0), fiyat (>0), KDV oranı (>0, muafiyet kodu yoksa); belge no GİB formatı (3 harf + yıl + 9 hane). Ürün varsayılanları `quantity=0`, `vat_rate=0`'dır — girilmedikçe doğrulama reddeder. Explicit `'efatura'` seçiminde alıcı e-Fatura mükellefi değilse de hata verir (1172 `TPS_POSTA_KUTUSU_YETKISI_YOK` öncesi).
 - **Test ortamları yalnızca birbirine gönderebilir**: Test1 ve Test2 VKN'leri yalnızca **karşı ortama** gönderim kabul eder; aynı ortam içi gönderim teslim edilemez (`gonderimCevabiKodu 1172`). Başarılı teslimat: `durum:3` + `gonderimCevabiKodu:0` + boş detay.
 - **Rate limit**: Saniyede 5 istek.
 - **e-Arşiv ile e-Fatura/İrsaliye kullanıcıları farklıdır**: e-Arşiv için portal/WS kullanıcı adı genellikle `VKN.portaltest` gibi ayrı bir kimliktir.

@@ -125,6 +125,63 @@ abstract class fatura_builder
     public function validate(): array
     {
         $hatalar = [];
+
+        // ─── Satıcı zorunlu alanlar ───────────────────────────────────────
+        if ($this->satici->tax_number() === '') {
+            $hatalar[] = 'Satıcı vergi kimlik numarası (VKN/TCKN) boş — my_company()->set_tax_number(...) ile girilmeli.';
+        }
+        if ($this->satici->company_name() === '') {
+            $hatalar[] = 'Satıcı ünvanı boş — my_company()->set_company_name(...) ile girilmeli.';
+        }
+        if ($this->satici->address() === '') {
+            $hatalar[] = 'Satıcı adresi boş — my_company()->set_address(adres, ilçe, il, ülke) ile girilmeli.';
+        }
+        if ($this->satici->city() === '') {
+            $hatalar[] = 'Satıcı ili boş — my_company()->set_address(adres, ilçe, il, ülke) ile girilmeli.';
+        }
+
+        // ─── Alıcı zorunlu alanlar ────────────────────────────────────────
+        if ($this->alici->tax_number() === '') {
+            $hatalar[] = 'Alıcı vergi kimlik numarası (VKN/TCKN) boş — customer_company()->set_tax_number(...) ile girilmeli.';
+        }
+        $alici_unvan_ok = $this->alici->company_name() !== ''
+            || ($this->alici->first_name() !== '' && $this->alici->last_name() !== '');
+        if (!$alici_unvan_ok) {
+            $hatalar[] = 'Alıcı ünvanı veya ad-soyadı boş — customer_company()->set_company_name(...) '
+                . 'ya da set_first_name()/set_last_name() ile girilmeli.';
+        }
+        if ($this->alici->address() === '') {
+            $hatalar[] = 'Alıcı adresi boş — customer_company()->set_address(adres, ilçe, il, ülke) ile girilmeli.';
+        }
+        if ($this->alici->city() === '') {
+            $hatalar[] = 'Alıcı ili boş — customer_company()->set_address(adres, ilçe, il, ülke) ile girilmeli.';
+        }
+
+        // ─── Belge no formatı (set edildiyse GİB zorunlu formatı) ─────────
+        if ($this->belge_no !== '' && !preg_match('/^[A-Za-z]{3}\d{4}\d{9}$/', $this->belge_no)) {
+            $hatalar[] = "Belge no '{$this->belge_no}' GİB formatına uygun değil — "
+                . '3 harf + yıl + 9 hane (16 karakter), örn: ABC2009123456789.';
+        }
+
+        // ─── Ürün satırı zorunlu alanlar (ad, adet, birim fiyat) ──────────
+        foreach ($this->urunler->lines() as $i => $satir) {
+            $satir_no = $i + 1;
+            if ($satir['name'] === '') {
+                $hatalar[] = "Satır {$satir_no}: ürün/hizmet adı boş — set_product_name(...) ile girilmeli.";
+            }
+            if ($satir['quantity'] <= 0) {
+                $hatalar[] = "Satır {$satir_no}: miktar (adet) 0 veya negatif — set_quantity(...) ile girilmeli.";
+            }
+            if ($satir['unit_price'] <= 0) {
+                $hatalar[] = "Satır {$satir_no}: birim fiyat 0 veya negatif — set_unit_price(...) ile girilmeli.";
+            }
+            if ($satir['vat_rate'] <= 0 && $satir['vat_exemption_code'] === '') {
+                $hatalar[] = "Satır {$satir_no}: KDV oranı 0 — ya set_vat_rate(...) ile sıfırdan farklı bir oran girin, "
+                    . "ya da KDV 0 ise ÜRÜNE muafiyet kodu girin: add_product()->set_vat_exemption_code('223') "
+                    . '(örnek kodlar: 223, 301; tam liste: kdv_istisna_kodlari::KODLAR).';
+            }
+        }
+
         $uyumlu = invoice_builder::MUAFIYET_UYUMLU_TIPLER;
 
         foreach ($this->urunler->lines() as $i => $satir) {

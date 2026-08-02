@@ -21,10 +21,10 @@ class products
     {
         return [
             'name' => '',
-            'quantity' => 1,
+            'quantity' => 0,
             'unit' => 'C62',
             'unit_price' => 0.0,
-            'vat_rate' => 20.0,
+            'vat_rate' => 0.0,
             'discount' => 0.0,
             'vat_exemption_code' => '',
             'vat_exemption_description' => '',

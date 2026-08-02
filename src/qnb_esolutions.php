@@ -158,6 +158,15 @@ class qnb_esolutions
     {
         $turu = $this->resolve_type($type);
 
+        // Explicit 'efatura' seçildiyse alıcı e-Fatura mükellefi mi diye göndermeden önce kontrol et.
+        // (1172 TPS_POSTA_KUTUSU_YETKISI_YOK hatasına karşı — mükellef değilse GİB zarfı reddeder.)
+        if ($type === 'efatura' && $this->customer_company->tax_number() !== '' && !$this->is_buyer_efatura_taxpayer()) {
+            throw new validation_exception([
+                "Alıcı '{$this->customer_company->tax_number()}' e-Fatura mükellefi değil — e-Fatura gönderilemez. "
+                . "Alıcı mükellef değilse 'earsiv' kullanın ya da alıcı VKN'yi doğrulayın (1172 TPS_POSTA_KUTUSU_YETKISI_YOK).",
+            ]);
+        }
+
         $builder = $turu === 'earsiv'
             ? new create_earsiv($this->my_company, $this->customer_company, $this->products, $this->client)
             : new create_efatura($this->my_company, $this->customer_company, $this->products, $this->client);
@@ -221,18 +230,22 @@ class qnb_esolutions
         }
 
         // auto: alıcı e-Fatura mükellefi mi?
+        return $this->is_buyer_efatura_taxpayer() ? 'efatura' : 'earsiv';
+    }
+
+    /** Alıcının VKN'sinden e-Fatura mükellefi olup olmadığını sorgular. */
+    private function is_buyer_efatura_taxpayer(): bool
+    {
         $alici_vkn = $this->customer_company->tax_number();
         if ($alici_vkn === '') {
-            return 'earsiv';
+            return false;
         }
 
         try {
             $info = $this->client->invoice()->efatura_kullanici_bilgisi($alici_vkn);
-            return ($info->unvan !== '' || $info->etiket !== '' || $info->kayit_zamani !== '')
-                ? 'efatura'
-                : 'earsiv';
+            return $info->unvan !== '' || $info->etiket !== '' || $info->kayit_zamani !== '';
         } catch (\Throwable) {
-            return 'earsiv';
+            return false;
         }
     }
 }

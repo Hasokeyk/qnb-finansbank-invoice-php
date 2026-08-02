@@ -103,6 +103,52 @@ $oid = $c->invoice()->belge_gonder_ext(
 echo "Sent! Document OID: {$oid}\n";
 ```
 
+### Facade: `qnb_esolutions` (recommended)
+
+Single entry point; validation happens inside `create_invoice()`:
+
+```php
+<?php
+
+require 'vendor/autoload.php';
+
+use QnbSolutions\QnbEsolutions\builder\invoice_builder;
+use QnbSolutions\QnbEsolutions\qnb_esolutions;
+
+$qnb = new qnb_esolutions('USERNAME', 'PASSWORD', 'ERP_CODE');
+
+$qnb->document_no('NXT' . date('Y') . '000000001')   // GİB format: 3 letters + year + 9 digits
+    ->issue_date(date('Y-m-d'))
+    ->invoice_type(invoice_builder::TYPE_SATIS)      // SATIS | ISTISNA | IADE | ...
+    ->profile(invoice_builder::PROFILE_TICARI)       // TICARIFATURA | TEMELFATURA | ...
+    ->currency('TRY');
+
+$qnb->my_company()
+    ->set_company_name('SELLER LTD.')
+    ->set_tax_number('VKN')
+    ->set_tax_office('ÇANKAYA')
+    ->set_address('1 Address St', 'Çankaya', 'Ankara', 'Türkiye');
+
+$qnb->customer_company()
+    ->set_company_name('BUYER LTD.')
+    ->set_tax_number('BUYER_VKN')
+    ->set_tax_office('ÇANKAYA')
+    ->set_address('2 Address St', 'Kadıköy', 'İstanbul', 'Türkiye');
+
+$qnb->add_product()
+    ->set_product_name('Service')
+    ->set_quantity(1)
+    ->set_unit_price(1000.00)
+    ->set_vat_rate(20);
+
+// 'auto' | 'efatura' | 'earsiv'
+$result = $qnb->create_invoice('auto')->send();
+```
+
+- `create_invoice('auto')` → issues e-Fatura if the buyer is an e-Fatura taxpayer, otherwise e-Arşiv.
+- `create_invoice('efatura')` → throws `validation_exception` if the buyer is not a taxpayer (before the 1172 `TPS_POSTA_KUTUSU_YETKISI_YOK` error).
+- **Validation happens inside `create_invoice`**: any missing required field (seller/buyer VKN, name, address, city; product name, quantity, price, VAT; document number format) throws `validation_exception` and no send happens.
+
 ---
 
 ## Architecture
@@ -231,6 +277,7 @@ $oid = $c->invoice()->belge_gonder_ext(
 - **Hash formula**: `belge_hash_md5 = strtoupper(md5($xml))` — over the **raw UBL XML**, **UPPERCASE** hex MD5. Lowercase or different content → `SoapFault "Hash hatası"`.
 - **ERP code**: Use your own Özel Entegratör ERP code (`erp_kodu` or `erpBilgileriBelirle`). Values like `ERP1`/`ERP2` are rejected by the server.
 - **InvoiceTypeCode is a strict GİB code list**: `TICARI` and `KDV_MUAFIYETI` are **invalid** (schema control fails). `TICARIFATURA` is a `ProfileID`, not a type. QNB panel **InvoiceTypeCode** list: `SATIS, IADE, TEVKIFAT, TEVKIFATIADE, ISTISNA, OZELMATRAH, IHRACKAYITLI, SGK, KOMISYONCU, KONAKLAMAVERGISI`. **ProfileID** list: `TEMELFATURA, TICARIFATURA, KAMU, IHRACAT, YOLCUBERABERFATURA, HKS, ENERJI, ILAC_TIBBICIHAZ, YATIRIMTESVIK, IDIS`. Builder lists: `invoice_builder::INVOICE_TYPE_CODES` and `invoice_builder::PROFILE_IDS`. Invoices with VAT-exempt/exempt-code lines must use one of the types in `MUAFIYET_UYUMLU_TIPLER`.
+- **`create_invoice()` validation**: missing required fields throw `validation_exception` and no send happens — seller/buyer VKN, name, address, city; product name, quantity (>0), price (>0), VAT rate (>0 unless an exemption code is set); document number in GİB format (3 letters + year + 9 digits). Product defaults are `quantity=0`, `vat_rate=0` — validation rejects them until set. Explicit `'efatura'` also fails if the buyer is not an e-Fatura taxpayer (before the 1172 `TPS_POSTA_KUTUSU_YETKISI_YOK` error).
 - **Test environments can only send to each other**: Test1 and Test2 VKNs only accept delivery to the **opposite** environment; same-environment delivery cannot be delivered (`gonderimCevabiKodu 1172`). Successful delivery: `durum:3` + `gonderimCevabiKodu:0` + empty detail.
 - **Rate limit**: 5 requests per second.
 - **e-Archive users differ from e-Fatura/Despatch users**: the e-Archive portal/WS username is usually a separate identity such as `VKN.portaltest`.

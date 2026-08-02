@@ -21,8 +21,10 @@ $qnb->issue_date(date('Y-m-d'))
     ->profile(invoice_builder::PROFILE_TICARI)
     ->currency('TRY');
 
-$qnb->my_company()->set_company_name('SATICI A.Ş.')->set_tax_number('SIRKET_VKN');
-$qnb->customer_company()->set_company_name('ALICI LTD.')->set_tax_number('ALICI_VKN');
+$qnb->my_company()->set_company_name('SATICI A.Ş.')->set_tax_number('SIRKET_VKN')
+    ->set_address('Adres Sokak No:1', 'Çankaya', 'Ankara');
+$qnb->customer_company()->set_company_name('ALICI LTD.')->set_tax_number('ALICI_VKN')
+    ->set_address('Adres Sokak No:2', 'Kadıköy', 'İstanbul');
 
 // Bilinçli hata: bilinmeyen muafiyet kodu + SATIS tipi uyumsuzluğu
 $qnb->add_product()->set_product_name('Muafiyetli')->set_quantity(1)->set_unit_price(100.00)->set_vat_rate(0)

@@ -70,6 +70,15 @@ $mock = new class extends \SoapClient {
             return $wrapper;
         }
 
+        if ($name === 'efaturaKullaniciBilgisi') {
+            $r = new \stdClass;
+            $r->unvan = 'ALICI LTD.';
+            $r->etiket = 'TEST';
+            $ret = new \stdClass;
+            $ret->return = $r;
+            return $ret;
+        }
+
         $r = new \stdClass;
         $r->return = 'OK';
         return $r;
@@ -98,7 +107,8 @@ $my_company = (new my_company)
 
 $customer_company = (new customer_company)
     ->set_company_name('ALICI LTD. ŞTİ.')
-    ->set_tax_number('6312064090');
+    ->set_tax_number('6312064090')
+    ->set_address('Alıcı Adresi No:1', 'Kadıköy', 'İstanbul');
 
 $products = (new products)
     ->set_product_name('Eğitim Hizmeti')
@@ -167,10 +177,12 @@ $qnb = new qnb_esolutions('kullanici', 'sifre', 'ERP1', client::ENV_TEST2, $test
 
 $qnb->my_company()
     ->set_company_name('TEST2 FİRMASI')
-    ->set_tax_number('6312064091');
+    ->set_tax_number('6312064091')
+    ->set_address('İnönü Mah. Çetin Emeç Bulvarı No:8', 'Çankaya', 'Ankara');
 $qnb->customer_company()
     ->set_company_name('ALICI LTD.')
-    ->set_tax_number('6312064090');
+    ->set_tax_number('6312064090')
+    ->set_address('Alıcı Adresi No:1', 'Kadıköy', 'İstanbul');
 $qnb->product()
     ->set_product_name('Hizmet')
     ->set_quantity(1)
@@ -180,9 +192,15 @@ $qnb->product()
 $oid = $qnb->create_invoice('efatura')->send();
 test('facade OID', $oid, 'OID-EFATURA');
 
-$call = $mock->calls[0];
-test('facade metodu belgeGonderExt', $call['method'], 'belgeGonderExt');
-$params = $call['args'][0]['parametreler'] ?? [];
+$gonder = null;
+foreach ($mock->calls as $c) {
+    if ($c['method'] === 'belgeGonderExt') {
+        $gonder = $c;
+        break;
+    }
+}
+test('facade metodu belgeGonderExt', $gonder['method'] ?? null, 'belgeGonderExt');
+$params = $gonder['args'][0]['parametreler'] ?? [];
 test('facade veri XML', str_contains($params['veri'] ?? '', '<Invoice'), true);
 test('facade erpKodu', $params['erpKodu'] ?? '', 'ERP1');
 test('facade satici VKN', $params['vergiTcKimlikNo'] ?? '', '6312064091');
