@@ -11,7 +11,7 @@ class customer_company
     private string $tax_number = '';
     private string $first_name = '';
     private string $last_name = '';
-    private string $tax_office = 'ÇANKAYA';
+    private string $tax_office = '';
     private string $address = '';
     private string $district = '';
     private string $city = '';

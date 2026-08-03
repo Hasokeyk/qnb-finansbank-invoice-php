@@ -10,7 +10,7 @@ class my_company
     private string $company_name = '';
     private string $tax_number = '';
     private string $label = '';
-    private string $tax_office = 'ÇANKAYA';
+    private string $tax_office = '';
     private string $address = '';
     private string $district = '';
     private string $city = '';

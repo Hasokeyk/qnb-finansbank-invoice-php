@@ -77,7 +77,7 @@ $client = new client(
 
 // e-Fatura işlemleri
 $invoice = $client->invoice();
-$invoice->efatura_kullanici_bilgisi('1234567890');
+$invoice->efatura_user_info('1234567890');
 
 // e-İrsaliye işlemleri
 $despatch = $client->despatch();

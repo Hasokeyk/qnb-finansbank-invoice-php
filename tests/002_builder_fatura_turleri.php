@@ -46,6 +46,24 @@ function test_var(string $label, string $xml, string $xpath): void
     }
 }
 
+/** UBL-TR XSD sırası: AccountingCustomerParty'de cac:Person, cac:PostalAddress'ten SONRA gelmeli. */
+function test_alici_person_sira(string $label, string $xml): void
+{
+    global $ok, $fail;
+    $bas = strpos($xml, '<cac:AccountingCustomerParty>');
+    $bit = strpos($xml, '</cac:AccountingCustomerParty>') + strlen('</cac:AccountingCustomerParty>');
+    $blok = substr($xml, $bas, $bit - $bas);
+    $postal = strpos($blok, '<cac:PostalAddress>');
+    $person = strpos($blok, '<cac:Person>');
+    if ($postal !== false && $person !== false && $person > $postal) {
+        echo "  ✓ {$label} (Person, PostalAddress sonrasi)\n";
+        $ok++;
+    } else {
+        echo "  ✗ {$label}: postal={$postal}, person={$person}\n";
+        $fail++;
+    }
+}
+
 echo "=== Fatura Türleri Test ===\n";
 
 // 1. İade Faturası
@@ -152,6 +170,27 @@ $xml = (new invoice_builder)
 
 test('TCKN alici', $xml, '//cac:AccountingCustomerParty//cbc:ID', '10000000146');
 test('TCKN attribute', $xml, '//cac:AccountingCustomerParty//cbc:ID/@schemeID', 'TCKN');
+test('TCKN person ad', $xml, '//cac:AccountingCustomerParty//cac:Person/cbc:FirstName', 'ALİ');
+test('TCKN person soyad', $xml, '//cac:AccountingCustomerParty//cac:Person/cbc:FamilyName', 'VELİ');
+test('TCKN PartyName yok', $xml, '//cac:AccountingCustomerParty//cac:PartyName/cbc:Name', '(yok)');
+test_alici_person_sira('TCKN Person sira', $xml);
+
+// 9. İade (IADE) — orijinal fatura referansı + negatif tutarlar
+$xml = (new invoice_builder)
+    ->set_fatura_no('IADE2025001')
+    ->set_tarih('2025-01-20')
+    ->set_fatura_turu(invoice_builder::TYPE_IADE)
+    ->set_satici(vkn: '1234567890', unvan: 'SATICI A.Ş.')
+    ->set_alici(vkn: '9876543210', unvan: 'ALICI LTD.')
+    ->set_referans('FAT2025001', '2025-01-15', 'ABC-ETTN-123')
+    ->add_satir(isim: 'İade kalemi', miktar: -1, birim_fiyat: 200.00, kdv_oran: 20)
+    ->build();
+
+test('iade turu', $xml, '//cbc:InvoiceTypeCode', 'IADE');
+test('iade referans no', $xml, '//cac:BillingReference//cac:InvoiceDocumentReference//cbc:ID', 'FAT2025001');
+test('iade referans tarih', $xml, '//cac:BillingReference//cbc:IssueDate', '2025-01-15');
+test('iade referans ettn', $xml, '//cac:BillingReference//cbc:UUID', 'ABC-ETTN-123');
+test('iade negatif tutar', $xml, '//cbc:PayableAmount', '-240');
 
 echo "\n";
 echo "Sonuc: {$ok} gecti, {$fail} kaldi\n";

@@ -33,6 +33,18 @@ abstract class fatura_builder
     protected ?string $aciklama = null;
     protected int $teslim_gun = 0;
 
+    // İade (IADE) faturası için orijinal fatura referansı
+    protected string $referans_no = '';
+    protected string $referans_tarih = '';
+    protected string $referans_ettn = '';
+
+    /** Negatif tutarlı (iade) faturaların geçerli olduğu fatura tipleri. */
+    protected const IADE_TIPLERI = [
+        invoice_builder::TYPE_IADE,
+        invoice_builder::TYPE_TEVKIFAT_IADE,
+        invoice_builder::TYPE_YTBIADE,
+    ];
+
     protected ?string $xslt_adi = null;
     protected ?string $xslt_veri_base64 = null;
 
@@ -101,6 +113,21 @@ abstract class fatura_builder
         return $this;
     }
 
+    /**
+     * İade (IADE) faturası için orijinal fatura referansı.
+     *
+     * @param string $no    Orijinal faturanın numarası
+     * @param string $tarih Orijinal fatura tarihi (Y-m-d)
+     * @param string $ettn  Orijinal faturanın ETTN'si (varsa)
+     */
+    public function invoice_reference(string $no, string $tarih = '', string $ettn = ''): static
+    {
+        $this->referans_no = $no;
+        $this->referans_tarih = $tarih;
+        $this->referans_ettn = $ettn;
+        return $this;
+    }
+
     /** Özel fatura tasarımı (XSLT) belirtir. Base64 içerik bekler. */
     public function xslt(string $adi, string $veri_base64): static
     {
@@ -125,6 +152,7 @@ abstract class fatura_builder
     public function validate(): array
     {
         $hatalar = [];
+        $iade_mi = in_array($this->fatura_turu, self::IADE_TIPLERI, true);
 
         // ─── Satıcı zorunlu alanlar ───────────────────────────────────────
         if ($this->satici->tax_number() === '') {
@@ -163,17 +191,33 @@ abstract class fatura_builder
                 . '3 harf + yıl + 9 hane (16 karakter), örn: ABC2009123456789.';
         }
 
+        // ─── İade faturası: orijinal fatura referansı zorunlu ──────────────
+        if ($iade_mi && $this->referans_no === '') {
+            $hatalar[] = "İade faturası ({$this->fatura_turu}) için orijinal fatura referansı gerekli — "
+                . 'invoice_reference(no, tarih, ettn) ile belirtin.';
+        }
+
         // ─── Ürün satırı zorunlu alanlar (ad, adet, birim fiyat) ──────────
         foreach ($this->urunler->lines() as $i => $satir) {
             $satir_no = $i + 1;
             if ($satir['name'] === '') {
                 $hatalar[] = "Satır {$satir_no}: ürün/hizmet adı boş — set_product_name(...) ile girilmeli.";
             }
-            if ($satir['quantity'] <= 0) {
-                $hatalar[] = "Satır {$satir_no}: miktar (adet) 0 veya negatif — set_quantity(...) ile girilmeli.";
-            }
-            if ($satir['unit_price'] <= 0) {
-                $hatalar[] = "Satır {$satir_no}: birim fiyat 0 veya negatif — set_unit_price(...) ile girilmeli.";
+            if ($iade_mi) {
+                // İade: tutarlar negatif olabilir (ters kayıt), sıfır olamaz.
+                if ($satir['quantity'] == 0) {
+                    $hatalar[] = "Satır {$satir_no}: iade faturasında miktar 0 olamaz — negatif miktar girin (örn. set_quantity(-1)).";
+                }
+                if ($satir['unit_price'] == 0) {
+                    $hatalar[] = "Satır {$satir_no}: iade faturasında birim fiyat 0 olamaz.";
+                }
+            } else {
+                if ($satir['quantity'] <= 0) {
+                    $hatalar[] = "Satır {$satir_no}: miktar (adet) 0 veya negatif — set_quantity(...) ile girilmeli.";
+                }
+                if ($satir['unit_price'] <= 0) {
+                    $hatalar[] = "Satır {$satir_no}: birim fiyat 0 veya negatif — set_unit_price(...) ile girilmeli.";
+                }
             }
             if ($satir['vat_rate'] <= 0 && $satir['vat_exemption_code'] === '') {
                 $hatalar[] = "Satır {$satir_no}: KDV oranı 0 — ya set_vat_rate(...) ile sıfırdan farklı bir oran girin, "
@@ -239,7 +283,8 @@ abstract class fatura_builder
             ->set_alici(vkn: $this->alici->tax_number(), unvan: $this->alici->company_name(), ad: $this->alici->first_name(), soyad: $this->alici->last_name())
             ->set_alici_adres($this->alici->address(), $this->alici->district(), $this->alici->city(), $this->alici->country())
             ->set_alici_vergi_dairesi($this->alici->tax_office())
-            ->set_aciklama($this->aciklama);
+            ->set_aciklama($this->aciklama)
+            ->set_referans($this->referans_no, $this->referans_tarih, $this->referans_ettn);
 
         if ($this->teslim_gun > 0) {
             $builder->set_teslim_gun($this->teslim_gun);

@@ -21,7 +21,7 @@ e-Fatura ile aynı servis metodları kullanılır, belge türü farklıdır.
 Aynı metot e-İrsaliye için de kullanılır. (GİB sistemi e-Fatura ve e-İrsaliye için aynı mükellefiyeti kullanır.)
 
 ```php
-$user = $client->despatch()->efatura_kullanici_bilgisi('1234567890');
+$user = $client->despatch()->efatura_user_info('1234567890');
 ```
 
 ---

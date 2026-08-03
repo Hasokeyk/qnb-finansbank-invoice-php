@@ -84,7 +84,7 @@ class invoice_builder
     private string $satici_vkn = '';
     private string $satici_unvan = '';
     private string $satici_etiket = '';
-    private string $satici_vergi_dairesi = 'ÇANKAYA';
+    private string $satici_vergi_dairesi = '';
     private string $satici_adres = '';
     private string $satici_ilce = '';
     private string $satici_il = '';
@@ -94,7 +94,7 @@ class invoice_builder
     private string $alici_unvan = '';
     private string $alici_ad = '';
     private string $alici_soyad = '';
-    private string $alici_vergi_dairesi = 'ÇANKAYA';
+    private string $alici_vergi_dairesi = '';
 
     private string $alici_ilce = '';
     private string $alici_il = '';
@@ -104,6 +104,11 @@ class invoice_builder
     private array $satirlar = [];
     private string|null $aciklama = null;
     private int $teslim_gun = 0;
+
+    // İade (IADE) faturası için orijinal fatura referansı (cac:BillingReference)
+    private string $referans_no = '';
+    private string $referans_tarih = '';
+    private string $referans_ettn = '';
 
     public function set_fatura_no(string $no): static
     {
@@ -192,6 +197,21 @@ class invoice_builder
     public function set_teslim_gun(int $gun): static
     {
         $this->teslim_gun = $gun;
+        return $this;
+    }
+
+    /**
+     * İade (IADE) faturası için orijinal fatura referansı.
+     *
+     * @param string $no    Orijinal faturanın numarası (veya ETTN değilse ID)
+     * @param string $tarih Orijinal fatura tarihi (Y-m-d)
+     * @param string $ettn  Orijinal faturanın ETTN'si (varsa)
+     */
+    public function set_referans(string $no, string $tarih = '', string $ettn = ''): static
+    {
+        $this->referans_no = $no;
+        $this->referans_tarih = $tarih;
+        $this->referans_ettn = $ettn;
         return $this;
     }
 
@@ -348,6 +368,29 @@ XML;
             $this->satici_ulke,
             3,
         );
+
+        // GİB/UBL-TR kuralı: satıcı TCKN ise cac:Person, VKN ise cac:PartyName.
+        // XSD sırası: PartyIdentification → PartyName → PostalAddress → PartyTaxScheme → ... → Person.
+        $satici_tckn = strlen($this->satici_vkn) === 11 && is_numeric($this->satici_vkn);
+        $satici_scheme = $satici_tckn ? 'TCKN' : 'VKN';
+        $satici_parti_adi_xml = $satici_tckn ? '' : <<<XML
+         <cac:PartyName>
+            <cbc:Name>{$this->satici_unvan}</cbc:Name>
+         </cac:PartyName>
+XML;
+        $satici_kisi_xml = $satici_tckn ? $this->build_person('', '', $this->satici_unvan, 9) : '';
+
+        // Vergi dairesi verilmemişse cac:PartyTaxScheme hiç yazılmaz (fake 'ÇANKAYA' varsayılanı yok).
+        $satici_vergi_xml = $this->satici_vergi_dairesi !== ''
+            ? <<<XML
+         <cac:PartyTaxScheme>
+            <cac:TaxScheme>
+               <cbc:Name>{$this->satici_vergi_dairesi}</cbc:Name>
+            </cac:TaxScheme>
+         </cac:PartyTaxScheme>
+XML
+            : '';
+
         $alici_xml = $this->build_alici();
         $satir_sayisi = count($this->satirlar);
 
@@ -366,6 +409,9 @@ XML;
         }
 
         $signature_xml = $this->build_signature();
+
+        // İade faturasında orijinal faturaya atıf (cac:BillingReference → cac:InvoiceDocumentReference)
+        $billing_reference_xml = $this->referans_no !== '' ? $this->build_billing_reference() : '';
 
         return <<<XML
 <?xml version="1.0" encoding="UTF-8"?>
@@ -393,20 +439,12 @@ XML;
 {$saat_xml}   <cbc:InvoiceTypeCode>{$this->fatura_turu}</cbc:InvoiceTypeCode>
 {$aciklama_xml}   <cbc:DocumentCurrencyCode>{$this->parabirimi}</cbc:DocumentCurrencyCode>
    <cbc:LineCountNumeric>{$satir_sayisi}</cbc:LineCountNumeric>
-{$signature_xml}   <cac:AccountingSupplierParty>
+{$billing_reference_xml}{$signature_xml}   <cac:AccountingSupplierParty>
       <cac:Party>
          <cac:PartyIdentification>
-            <cbc:ID schemeID="VKN">{$this->satici_vkn}</cbc:ID>
+            <cbc:ID schemeID="{$satici_scheme}">{$this->satici_vkn}</cbc:ID>
          </cac:PartyIdentification>
-         <cac:PartyName>
-            <cbc:Name>{$this->satici_unvan}</cbc:Name>
-         </cac:PartyName>
-{$satici_adres_xml}         <cac:PartyTaxScheme>
-            <cac:TaxScheme>
-               <cbc:Name>{$this->satici_vergi_dairesi}</cbc:Name>
-            </cac:TaxScheme>
-         </cac:PartyTaxScheme>
-      </cac:Party>
+{$satici_parti_adi_xml}{$satici_adres_xml}{$satici_vergi_xml}{$satici_kisi_xml}      </cac:Party>
    </cac:AccountingSupplierParty>
 {$alici_xml}
 {$odeme_xml}   <cac:TaxTotal>
@@ -449,6 +487,8 @@ XML;
 
     private function build_signature(): string
     {
+        $satici_scheme = strlen($this->satici_vkn) === 11 && is_numeric($this->satici_vkn) ? 'TCKN' : 'VKN';
+
         $adres_xml = $this->build_adres(
             $this->satici_adres,
             $this->satici_ilce,
@@ -461,7 +501,7 @@ XML;
       <cbc:ID schemeID="VKN_TCKN">{$this->satici_vkn}</cbc:ID>
       <cac:SignatoryParty>
          <cac:PartyIdentification>
-            <cbc:ID schemeID="VKN">{$this->satici_vkn}</cbc:ID>
+            <cbc:ID schemeID="{$satici_scheme}">{$this->satici_vkn}</cbc:ID>
          </cac:PartyIdentification>
 {$adres_xml}      </cac:SignatoryParty>
       <cac:DigitalSignatureAttachment>
@@ -479,19 +519,6 @@ XML;
             ? 'TCKN'
             : 'VKN';
 
-        $ad_soyad = '';
-        if ($this->alici_ad !== '') {
-            $ad_soyad = $this->alici_soyad !== ''
-                ? "{$this->alici_ad} {$this->alici_soyad}"
-                : $this->alici_ad;
-        }
-
-        $kisi = $ad_soyad !== '' ? <<<XML
-            <cac:Contact>
-               <cbc:Name>{$ad_soyad}</cbc:Name>
-            </cac:Contact>
-XML : '';
-
         $adres_xml = $this->build_adres(
             $this->alici_adres,
             $this->alici_ilce,
@@ -500,23 +527,81 @@ XML : '';
             3,
         );
 
+        // GİB/UBL-TR kuralı: TCKN → cac:Person (PostalAddress'ten SONRA), VKN → cac:PartyName.
+        // XSD sırası: PartyIdentification → PartyName → PostalAddress → PartyTaxScheme → ... → Person.
+        $parti_adi_xml = $vkn_tckn === 'TCKN' ? '' : <<<XML
+         <cac:PartyName>
+            <cbc:Name>{$this->alici_unvan}</cbc:Name>
+         </cac:PartyName>
+XML;
+        $kisi_xml = $vkn_tckn === 'TCKN'
+            ? $this->build_person($this->alici_ad, $this->alici_soyad, $this->alici_unvan, 9)
+            : '';
+
+        // Vergi dairesi verilmemişse cac:PartyTaxScheme hiç yazılmaz.
+        $vergi_xml = $this->alici_vergi_dairesi !== ''
+            ? <<<XML
+         <cac:PartyTaxScheme>
+            <cac:TaxScheme>
+               <cbc:Name>{$this->alici_vergi_dairesi}</cbc:Name>
+            </cac:TaxScheme>
+         </cac:PartyTaxScheme>
+XML
+            : '';
+
         return <<<XML
    <cac:AccountingCustomerParty>
       <cac:Party>
          <cac:PartyIdentification>
             <cbc:ID schemeID="{$vkn_tckn}">{$this->alici_vkn}</cbc:ID>
          </cac:PartyIdentification>
-         <cac:PartyName>
-            <cbc:Name>{$this->alici_unvan}</cbc:Name>
-         </cac:PartyName>
-{$adres_xml}         <cac:PartyTaxScheme>
-            <cac:TaxScheme>
-               <cbc:Name>{$this->alici_vergi_dairesi}</cbc:Name>
-            </cac:TaxScheme>
-         </cac:PartyTaxScheme>
-{$kisi}
-      </cac:Party>
+{$parti_adi_xml}{$adres_xml}{$vergi_xml}{$kisi_xml}      </cac:Party>
    </cac:AccountingCustomerParty>
+XML;
+    }
+
+    /**
+     * Gerçek kişi (TCKN) için cac:Person üretir.
+     * Ad/soyad verilmemişse ünvanı son boşluktan bölerek doldurur.
+     *
+     * @param int $indent satır başı girintisi (Parti elemanlarıyla hizalı olmalı)
+     */
+    private function build_person(string $ad, string $soyad, string $unvan, int $indent): string
+    {
+        if ($ad === '' && $soyad === '' && $unvan !== '') {
+            $parcalar = preg_split('/\s+/', trim($unvan));
+            $soyad = array_pop($parcalar) ?? '';
+            $ad = implode(' ', $parcalar);
+        }
+
+        $pad = str_repeat(' ', $indent);
+        return <<<XML
+$pad<cac:Person>
+$pad   <cbc:FirstName>{$ad}</cbc:FirstName>
+$pad   <cbc:FamilyName>{$soyad}</cbc:FamilyName>
+$pad</cac:Person>
+XML;
+    }
+
+    /**
+     * İade faturası için orijinal fatura referansı üretir.
+     * GİB kuralı: IADE tipi faturalarda cac:BillingReference zorunludur.
+     */
+    private function build_billing_reference(): string
+    {
+        $tarih_xml = $this->referans_tarih !== ''
+            ? "         <cbc:IssueDate>{$this->referans_tarih}</cbc:IssueDate>\n"
+            : '';
+        $ettn_xml = $this->referans_ettn !== ''
+            ? "         <cbc:UUID>{$this->referans_ettn}</cbc:UUID>\n"
+            : '';
+
+        return <<<XML
+   <cac:BillingReference>
+      <cac:InvoiceDocumentReference>
+         <cbc:ID>{$this->referans_no}</cbc:ID>
+{$tarih_xml}{$ettn_xml}      </cac:InvoiceDocumentReference>
+   </cac:BillingReference>
 XML;
     }
 }

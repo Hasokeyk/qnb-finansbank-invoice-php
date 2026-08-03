@@ -44,6 +44,9 @@ class qnb_esolutions
     private int $due_days = 0;
     private ?string $xslt_adi = null;
     private ?string $xslt_veri_base64 = null;
+    private string $referans_no = '';
+    private string $referans_tarih = '';
+    private string $referans_ettn = '';
 
     public function __construct(
         string $username,
@@ -132,6 +135,21 @@ class qnb_esolutions
         return $this;
     }
 
+    /**
+     * İade (IADE) faturası için orijinal fatura referansı.
+     *
+     * @param string $no    Orijinal faturanın numarası
+     * @param string $tarih Orijinal fatura tarihi (Y-m-d)
+     * @param string $ettn  Orijinal faturanın ETTN'si (varsa)
+     */
+    public function invoice_reference(string $no, string $tarih = '', string $ettn = ''): static
+    {
+        $this->referans_no = $no;
+        $this->referans_tarih = $tarih;
+        $this->referans_ettn = $ettn;
+        return $this;
+    }
+
     /** Özel fatura tasarımı (XSLT). Base64 içerik bekler. */
     public function xslt(string $adi, string $veri_base64): static
     {
@@ -194,6 +212,9 @@ class qnb_esolutions
         if ($this->due_days > 0) {
             $builder->due_days($this->due_days);
         }
+        if ($this->referans_no !== '') {
+            $builder->invoice_reference($this->referans_no, $this->referans_tarih, $this->referans_ettn);
+        }
         if ($this->xslt_adi !== null) {
             $builder->xslt($this->xslt_adi, $this->xslt_veri_base64 ?? '');
         }
@@ -221,25 +242,25 @@ class qnb_esolutions
     }
 
     /**
-     * Alıcının e-Fatura mükellefi olup olmadığını sorgular (canlı/GİB).
+     * Queries whether the buyer is an e-Fatura registered taxpayer (live/GIB).
      *
-     * @param string|null $vergi_tc_kimlik_no VKN/TCKN; verilmezse customer_company()'den alınır
+     * @param string|null $vergi_tc_kimlik_no VKN/TCKN; falls back to customer_company() when omitted
      */
     public function is_efatura_taxpayer(?string $vergi_tc_kimlik_no = null): bool
     {
-        $alici_vkn = $vergi_tc_kimlik_no ?? $this->customer_company->tax_number();
-        if ($alici_vkn === '') {
+        $buyer_tax_no = $vergi_tc_kimlik_no ?? $this->customer_company->tax_number();
+        if ($buyer_tax_no === '') {
             return false;
         }
 
-        $info = $this->client->invoice()->efatura_kullanici_bilgisi($alici_vkn);
-        return $info->unvan !== '' || $info->etiket !== '' || $info->kayit_zamani !== '';
+        $info = $this->client->invoice()->efatura_user_info($buyer_tax_no);
+        return $info->title !== '' || $info->label !== '' || $info->registration_time !== '';
     }
 
-    /** Alıcının e-Fatura kayıt bilgilerini sorgular (unvan, etiket, kayıt zamanı). */
-    public function efatura_kullanici_bilgisi(string $vergi_tc_kimlik_no): registered_user
+    /** Queries the buyer's e-Fatura registration info (title, label, registration time). */
+    public function efatura_user_info(string $vergi_tc_kimlik_no): registered_user
     {
-        return $this->client->invoice()->efatura_kullanici_bilgisi($vergi_tc_kimlik_no);
+        return $this->client->invoice()->efatura_user_info($vergi_tc_kimlik_no);
     }
 
     /**

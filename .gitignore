@@ -4,4 +4,6 @@ vendor/
 *.log
 index.php
 control.php
+cancel_invoice.php
+test_tckn.php
 AGENTS.md

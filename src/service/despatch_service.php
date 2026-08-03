@@ -13,7 +13,7 @@ class despatch_service
     ) {
     }
 
-    public function efatura_kullanici_bilgisi(string $vergi_tc_kimlik_no): registered_user
+    public function efatura_user_info(string $vergi_tc_kimlik_no): registered_user
     {
         $result = $this->connector->efaturaKullaniciBilgisi([
             'vergiTcKimlikNo' => $vergi_tc_kimlik_no,
@@ -22,10 +22,10 @@ class despatch_service
         $data = $result->return ?? $result;
 
         return new registered_user(
-            etiket: $data->etiket ?? '',
-            kamu_kurulusu: ($data->kamuKurulusu ?? false) === true,
-            kayit_zamani: $data->kayitZamani ?? '',
-            unvan: $data->unvan ?? '',
+            label: $data->etiket ?? '',
+            is_public_institution: ($data->kamuKurulusu ?? false) === true,
+            registration_time: $data->kayitZamani ?? '',
+            title: $data->unvan ?? '',
         );
     }
 

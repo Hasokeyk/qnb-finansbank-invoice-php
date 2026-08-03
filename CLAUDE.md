@@ -39,7 +39,7 @@ composer dump-autoload                 # autoload güncelle
 
 - **Çift-base64 tuzağı**: WSDL'de `veri`/`belgeIcerigi`/`dosya`/`xsltVeri` `base64Binary` tiptir; PHP `SoapClient` string değeri kendi encode eder. Caller `base64_decode($veri_base64, true)` sonucunu geçirmeli, yoksa "Hash hatası" döner.
 - **Hash formülü**: `belge_hash_md5 = strtoupper(md5($xml))` — ham UBL XML üzerinde, BÜYÜK harf hex.
-- **ERP kodu `NXT31410`**; `ERP1`/`ERP2` reddedilir.
+- **ERP kodu**: canlı ortamda hesaba özel bir ERP kodu gerekir; `ERP1`/`ERP2` reddedilir. Kendi kodunu `erp_kodu` parametresinden ver.
 - **InvoiceTypeCode sıkı GİB listesidir**: `TICARI`, `KDV_MUAFIYETI` geçersiz. `TYPE_TICARI='SATIS'`, `TYPE_KDV_MUAFIYETI='ISTISNA'`.
 - **test1 içi gönderim yasak**: alıcı diğer ortamın VKN'si olmalı.
 - Endpoint URL'lerinin tek kaynağı `src/client.php` `client::URLS`. Kimlik bilgileri ve tam endpoint tablosu `AGENTS.md`'de.

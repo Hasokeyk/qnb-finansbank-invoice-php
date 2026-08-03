@@ -197,8 +197,8 @@ $c->authenticate();
 $svc = $c->invoice();
 
 // Alıcı mükellef mi?
-$u = $svc->efatura_kullanici_bilgisi('1234567890');
-echo $u->unvan;
+$u = $svc->efatura_user_info('1234567890');
+echo $u->title;
 
 // Kayıtlı kullanıcı listesi (base64 zip)
 $zip = $svc->kayitli_kullanici_listele_extended();

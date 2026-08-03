@@ -197,8 +197,8 @@ $c->authenticate();
 $svc = $c->invoice();
 
 // Is the buyer a registered taxpayer?
-$u = $svc->efatura_kullanici_bilgisi('1234567890');
-echo $u->unvan;
+$u = $svc->efatura_user_info('1234567890');
+echo $u->title;
 
 // Registered user list (base64 zip)
 $zip = $svc->kayitli_kullanici_listele_extended();

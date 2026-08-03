@@ -86,7 +86,7 @@ $mock = new class extends \SoapClient {
 };
 
 // Mock SoapClient kullanan özel client (gerçek WSDL yok, network yok)
-$test_client = new class('6312064091', 'test', client::ENV_TEST2) extends client {
+$test_client = new class('1111111111', 'test', client::ENV_TEST2) extends client {
     public \SoapClient $soap;
     public function invoice(): invoice_service
     {
@@ -102,12 +102,12 @@ $test_client->soap = $mock;
 // ─── Entity'ler ──────────────────────────────────────────────────────────
 $my_company = (new my_company)
     ->set_company_name('TEST2 FİRMASI')
-    ->set_tax_number('6312064091')
+    ->set_tax_number('1111111111')
     ->set_address('İnönü Mah. Çetin Emeç Bulvarı No:8', 'Çankaya', 'Ankara');
 
 $customer_company = (new customer_company)
     ->set_company_name('ALICI LTD. ŞTİ.')
-    ->set_tax_number('6312064090')
+    ->set_tax_number('2222222222')
     ->set_address('Alıcı Adresi No:1', 'Kadıköy', 'İstanbul');
 
 $products = (new products)
@@ -165,7 +165,7 @@ $params = $call['args'][0] ?? [];
 $input = json_decode($params['input'] ?? '{}', true);
 $fatura = $params['fatura'] ?? [];
 test('earsiv input JSON islemId', isset($input['islemId']) && $input['islemId'] !== '', true);
-test('earsiv input JSON vkn', $input['vkn'] ?? '', '6312064091');
+test('earsiv input JSON vkn', $input['vkn'] ?? '', '1111111111');
 test('earsiv input JSON erpKodu', $input['erpKodu'] ?? '', 'ERP1');
 test('earsiv input JSON donenBelgeFormati', $input['donenBelgeFormati'] ?? '', '3');
 test('earsiv fatura belgeFormati UBL', $fatura['belgeFormati'] ?? '', 'UBL');
@@ -177,11 +177,11 @@ $qnb = new qnb_esolutions('kullanici', 'sifre', 'ERP1', client::ENV_TEST2, $test
 
 $qnb->my_company()
     ->set_company_name('TEST2 FİRMASI')
-    ->set_tax_number('6312064091')
+    ->set_tax_number('1111111111')
     ->set_address('İnönü Mah. Çetin Emeç Bulvarı No:8', 'Çankaya', 'Ankara');
 $qnb->customer_company()
     ->set_company_name('ALICI LTD.')
-    ->set_tax_number('6312064090')
+    ->set_tax_number('2222222222')
     ->set_address('Alıcı Adresi No:1', 'Kadıköy', 'İstanbul');
 $qnb->product()
     ->set_product_name('Hizmet')
@@ -203,7 +203,7 @@ test('facade metodu belgeGonderExt', $gonder['method'] ?? null, 'belgeGonderExt'
 $params = $gonder['args'][0]['parametreler'] ?? [];
 test('facade veri XML', str_contains($params['veri'] ?? '', '<Invoice'), true);
 test('facade erpKodu', $params['erpKodu'] ?? '', 'ERP1');
-test('facade satici VKN', $params['vergiTcKimlikNo'] ?? '', '6312064091');
+test('facade satici VKN', $params['vergiTcKimlikNo'] ?? '', '1111111111');
 
 echo "\n";
 echo "Sonuc: {$ok} gecti, {$fail} kaldi\n";

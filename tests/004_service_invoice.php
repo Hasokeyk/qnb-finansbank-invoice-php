@@ -71,11 +71,11 @@ function test(string $label, mixed $deger, mixed $beklenen): void
 echo "=== invoice_service Test (mock) ===\n";
 
 // efaturaKullaniciBilgisi
-$u = $svc->efatura_kullanici_bilgisi('9876543210');
-test('kullanici unvan', $u->unvan, 'TEST FİRMASI LTD. ŞTİ.');
-test('kullanici etiket', $u->etiket, 'TEST');
-test('kullanici kayit', $u->kayit_zamani, '2025-01-01 12:00:00');
-test('kullanici kamu', $u->kamu_kurulusu, false);
+$u = $svc->efatura_user_info('9876543210');
+test('user title', $u->title, 'TEST FİRMASI LTD. ŞTİ.');
+test('user label', $u->label, 'TEST');
+test('user registration time', $u->registration_time, '2025-01-01 12:00:00');
+test('user public institution', $u->is_public_institution, false);
 
 // kayitliKullaniciListeleExtended
 $data = $svc->kayitli_kullanici_listele_extended();

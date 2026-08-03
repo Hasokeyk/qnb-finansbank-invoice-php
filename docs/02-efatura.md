@@ -2,7 +2,7 @@
 
 ## Akış
 
-1. Alıcının e-Fatura mükellefi olduğu `efatura_kullanici_bilgisi` ile teyit edilir.
+1. Alıcının e-Fatura mükellefi olduğu `efatura_user_info` ile teyit edilir.
 2. Fatura XML'i UBL formatında hazırlanır, base64 kodlanır, MD5 hash'i hesaplanır.
 3. `belge_gonder_ext` ile fatura gönderilir → **belgeOid** döner.
 4. `giden_belge_durum_sorgula_ext` ile durum periyodik olarak sorgulanır.
@@ -35,10 +35,10 @@ Alıcının e-Fatura mükellefi olup olmadığını sorgular.
 ### Kullanım
 
 ```php
-$user = $client->invoice()->efatura_kullanici_bilgisi('1234567890');
-echo $user->unvan;        // FIRMA ADI
-echo $user->etiket;       // urn:mail:defaultpk@firma.com.tr
-echo $user->kayit_zamani; // 2023-01-01 12:00:00
+$user = $client->invoice()->efatura_user_info('1234567890');
+echo $user->title;               // FIRMA ADI
+echo $user->label;               // urn:mail:defaultpk@firma.com.tr
+echo $user->registration_time;   // 2023-01-01 12:00:00
 ```
 
 ---
